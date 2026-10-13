@@ -97,6 +97,7 @@
                         <th>الدخول</th>
                         <th>الانصراف</th>
                         <th>الإجمالي</th>
+                        <th id="th-action-header" class="hidden">الإجراء</th>
                     </tr>
                 </thead>
                 <tbody id="attendance-history-body"></tbody>
@@ -141,17 +142,20 @@
             let activeTimerBox = document.getElementById('employee-active-timer-box');
             let liveLocBox = document.getElementById('admin-live-location-box');
             let empGpsBox = document.getElementById('employee-gps-box');
+            let thActionHeader = document.getElementById('th-action-header');
 
             if (role === 'admin') {
                 editSection.classList.remove('hidden');
                 if (activeTimerBox) activeTimerBox.style.display = 'none';
                 if (liveLocBox) liveLocBox.classList.remove('hidden');
                 if (empGpsBox) empGpsBox.style.display = 'none';
+                if (thActionHeader) thActionHeader.classList.remove('hidden');
                 applyEditingState();
             } else {
                 editSection.classList.add('hidden');
                 if (liveLocBox) liveLocBox.classList.add('hidden');
                 if (empGpsBox) empGpsBox.style.display = 'block';
+                if (thActionHeader) thActionHeader.classList.add('hidden');
             }
 
             if (activeEmployee.current_lat && activeEmployee.current_lon) {
@@ -344,35 +348,51 @@
 
         async function loadAttendanceHistory() {
             let tbody = document.getElementById('attendance-history-body');
-            // جلب السجلات بدون ترتيب بـ created_at لتجنب أي خطأ في الأعمدة الافتراضية
             let { data: history, error } = await db.from('attendance_history').select('*');
 
             if (error) {
-                tbody.innerHTML = '<tr><td colspan="4" style="color: red;">خطأ في تحميل السجلات.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="color: red;">خطأ في تحميل السجلات.</td></tr>';
                 return;
             }
 
             if (!history || history.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" style="color: gray;">لا توجد سجلات سابقة.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="color: gray;">لا توجد سجلات سابقة.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = '';
             history.forEach(item => {
+                let deleteBtnHtml = role === 'admin' 
+                    ? `<td><button onclick="deleteAttendanceRecord('${item.id}')" style="background-color: #e74c3c; padding: 5px 10px; font-size: 13px; width: auto; margin:0;">حذف</button></td>` 
+                    : '';
+
                 tbody.innerHTML += `
                     <tr>
                         <td><b>${item.work_date || '-'}</b></td>
                         <td style="color:green;">${item.start_time || '-'}</td>
                         <td style="color:red;">${item.end_time || '-'}</td>
                         <td><b>${item.total_hours || '-'}</b></td>
+                        ${deleteBtnHtml}
                     </tr>
                 `;
             });
         }
 
+        async function deleteAttendanceRecord(recordId) {
+            if (!confirm('هل أنت متأكد من حذف هذا السجل نهائياً؟')) return;
+
+            let { error } = await db.from('attendance_history').delete().eq('id', recordId);
+            if (error) {
+                alert('فشل حذف السجل: ' + error.message);
+                return;
+            }
+
+            alert('تم حذف السجل بنجاح!');
+            loadAttendanceHistory();
+        }
+
         async function loadChatMessages() {
             let box = document.getElementById('chat-messages-box');
-            // استعلام آمن ومباشر لجلب الرسائل الخاصة بالمستخدم أو الآدمن دون أي أخطاء
             let { data: messages, error } = await db.from('messages').select('*');
 
             if (error) {
