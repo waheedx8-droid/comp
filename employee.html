@@ -119,6 +119,7 @@
     </div>
 
     <script>
+        // ضع هنا رابط ومفتاح مشروعك الحقيقيين من Supabase
         const SUPABASE_URL = "https://sthvmzkmfifdujdxzujw.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_OWPdd4ardgX3jLJzjmuk1A_C8mNTvhn";
         const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -329,9 +330,8 @@
             
             let totalHoursStr = `${Math.floor(totalSec / 3600)}س ${Math.floor((totalSec % 3600) / 60)}د ${totalSec % 60}ث`;
 
-            // حفظ السجل التاريخي بدون إرسال الموقع
+            // حفظ السجل التاريخي بدون حقل employee_id لتجنب قيود نوع UUID في الجدول
             let { error: historyErr } = await db.from('attendance_history').insert([{
-                employee_id: String(empId),
                 work_date: startDateStr,
                 start_time: startTimeStr,
                 end_time: endTimeStr,
@@ -404,7 +404,6 @@
             let { data: history, error } = await db
                 .from('attendance_history')
                 .select('*')
-                .eq('employee_id', String(empId))
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -433,7 +432,19 @@
 
         async function loadChatMessages() {
             let box = document.getElementById('chat-messages-box');
-            let { data: messages } = await db.from('messages').select('*').or(`receiver.eq.${activeEmployee.username},receiver.eq.all,sender.eq.${activeEmployee.username}`).order('created_at', { ascending: true });
+            let targetUser = role === 'admin' ? activeEmployee.username : activeEmployee.username;
+            
+            // جلب الرسائل المرتبطة بهذا الموظف تحديداً أو الرسائل الجماعية
+            let { data: messages, error } = await db
+                .from('messages')
+                .select('*')
+                .or(`receiver.eq.${targetUser},sender.eq.${targetUser},receiver.eq.all`)
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                console.error("خطأ في تحميل المحادثة:", error);
+                return;
+            }
 
             box.innerHTML = '';
             if (!messages || messages.length === 0) {
@@ -464,10 +475,11 @@
             let text = input.value.trim();
             if (!text) return;
 
+            // تحديد المرسل والمستقبل بدقة حسب من يقوم بتسجيل الدخول (آدمن أو موظف)
             let sender = role === 'admin' ? 'admin' : activeEmployee.username;
             let receiver = role === 'admin' ? activeEmployee.username : 'admin';
 
-            await db.from('messages').insert([{
+            let { error } = await db.from('messages').insert([{
                 sender: sender,
                 receiver: receiver,
                 text: text,
@@ -475,13 +487,18 @@
                 read_by_admin: role === 'admin'
             }]);
 
+            if (error) {
+                alert('فشل إرسال الرسالة: ' + error.message);
+                return;
+            }
+
             input.value = '';
             loadChatMessages();
         }
 
         async function checkNotifications() {
             if (role === 'admin') return;
-            let { data } = await db.from('messages').select('*').eq('receiver', activeEmployee.username).eq('sender', 'admin');
+            let { data } = await db.from('messages').select('*').eq('receiver', activeEmployee.username).eq('sender', 'admin').eq('read_by_admin', false);
             if (data && data.length > 0) {
                 document.getElementById('employee-notification-alert').classList.remove('hidden');
             }
