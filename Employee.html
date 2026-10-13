@@ -57,7 +57,6 @@
             <p id="gps-status-label" style="font-size: 12px; color: gray; margin: 5px 0 0 0; text-align: center;">حالة الموقع: لم يتم التفعيل بعد</p>
         </div>
 
-        <!-- قسم إدارة حساب الموظف من قبل الآدمن -->
         <div id="admin-edit-employee-section" class="hidden" style="background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h3 style="margin:0; color: #2980b9;">⚙️ إدارة حساب وراتب هذا الموظف</h3>
@@ -71,7 +70,7 @@
             <input type="text" id="edit-emp-user" disabled>
             
             <label style="font-size: 13px; font-weight: bold;">كلمة المرور الجديدة:</label>
-            <input type="password" id="edit-emp-pass" placeholder="كلمة المرور الجديدة (اتركها فارغة إذا لم ترد تغييرها)" disabled>
+            <input type="password" id="edit-emp-pass" placeholder="كلمة المرور الجديدة" disabled>
 
             <label style="font-size: 13px; font-weight: bold;">الراتب الأساسي ($):</label>
             <input type="number" id="edit-emp-salary" disabled min="0">
@@ -120,9 +119,9 @@
     </div>
 
     <script>
-        const SUPABASE_URL = "YOUR_SUPABASE_URL";
-        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const SUPABASE_URL = "https://sthvmzkmfifdujdxzujw.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_OWPdd4ardgX3jLJzjmuk1A_C8mNTvhn";
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let role = localStorage.getItem('hr_logged_role');
         let empId = role === 'admin' ? localStorage.getItem('hr_managing_emp_id') : localStorage.getItem('hr_logged_emp_id');
@@ -139,7 +138,7 @@
         };
 
         async function fetchEmployeeData() {
-            let { data } = await supabase.from('employees').select('*').eq('id', empId).single();
+            let { data } = await db.from('employees').select('*').eq('id', empId).maybeSingle();
             if (!data) { window.location.href = 'index.html'; return; }
             activeEmployee = data;
 
@@ -186,7 +185,7 @@
         function enableEmployeeLocation() {
             if (!navigator.geolocation) { alert('متصفحك لا يدعم تحديد الموقع.'); return; }
             navigator.geolocation.getCurrentPosition(async (pos) => {
-                await supabase.from('employees').update({
+                await db.from('employees').update({
                     current_lat: pos.coords.latitude,
                     current_lon: pos.coords.longitude
                 }).eq('id', empId);
@@ -250,7 +249,7 @@
             let obj = { name, username, salary };
             if (pass) obj.password = pass;
 
-            let { error } = await supabase.from('employees').update(obj).eq('id', empId);
+            let { error } = await db.from('employees').update(obj).eq('id', empId);
             if (error) alert('خطأ في التحديث أو اسم المستخدم مستخدم مسبقاً.');
             else {
                 alert('تم التحديث بنجاح!');
@@ -261,7 +260,7 @@
 
         async function deleteThisEmployee() {
             if (!confirm('هل أنت متأكد من الحذف؟')) return;
-            await supabase.from('employees').delete().eq('id', empId);
+            await db.from('employees').delete().eq('id', empId);
             goBack();
         }
 
@@ -274,7 +273,7 @@
 
             if (navigator.geolocation) {
                 watchId = navigator.geolocation.watchPosition(async (pos) => {
-                    await supabase.from('employees').update({
+                    await db.from('employees').update({
                         current_lat: pos.coords.latitude,
                         current_lon: pos.coords.longitude
                     }).eq('id', empId);
@@ -289,7 +288,7 @@
             };
             localStorage.setItem(`temp_start_${empId}`, JSON.stringify(startObj));
 
-            await supabase.from('employees').update({ status: 'على رأس العمل' }).eq('id', empId);
+            await db.from('employees').update({ status: 'على رأس العمل' }).eq('id', empId);
             alert('تم تسجيل الحضور بنجاح 🟢');
             fetchEmployeeData();
         }
@@ -308,7 +307,7 @@
 
             let mapLink = activeEmployee.current_lat ? `https://www.google.com/maps?q=${activeEmployee.current_lat},${activeEmployee.current_lon}` : null;
 
-            await supabase.from('attendance_history').insert([{
+            await db.from('attendance_history').insert([{
                 employee_id: empId,
                 work_date: startData.startDateStr,
                 start_time: startData.startTimeStr,
@@ -317,7 +316,7 @@
                 location: mapLink
             }]);
 
-            await supabase.from('employees').update({ status: 'منصرف', current_lat: null, current_lon: null }).eq('id', empId);
+            await db.from('employees').update({ status: 'منصرف', current_lat: null, current_lon: null }).eq('id', empId);
             localStorage.removeItem(`temp_start_${empId}`);
             stopTimer();
 
@@ -364,7 +363,7 @@
 
         async function loadAttendanceHistory() {
             let tbody = document.getElementById('attendance-history-body');
-            let { data: history } = await supabase.from('attendance_history').select('*').eq('employee_id', empId).order('created_at', { ascending: false });
+            let { data: history } = await db.from('attendance_history').select('*').eq('employee_id', empId).order('created_at', { ascending: false });
 
             if (!history || history.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" style="color: gray;">لا توجد سجلات سابقة.</td></tr>';
@@ -388,7 +387,7 @@
 
         async function loadChatMessages() {
             let box = document.getElementById('chat-messages-box');
-            let { data: messages } = await supabase.from('messages').select('*').or(`receiver.eq.${activeEmployee.username},receiver.eq.all,sender.eq.${activeEmployee.username}`).order('created_at', { ascending: true });
+            let { data: messages } = await db.from('messages').select('*').or(`receiver.eq.${activeEmployee.username},receiver.eq.all,sender.eq.${activeEmployee.username}`).order('created_at', { ascending: true });
 
             box.innerHTML = '';
             if (!messages || messages.length === 0) {
@@ -422,7 +421,7 @@
             let sender = role === 'admin' ? 'admin' : activeEmployee.username;
             let receiver = role === 'admin' ? activeEmployee.username : 'admin';
 
-            await supabase.from('messages').insert([{
+            await db.from('messages').insert([{
                 sender: sender,
                 receiver: receiver,
                 text: text,
@@ -436,7 +435,7 @@
 
         async function checkNotifications() {
             if (role === 'admin') return;
-            let { data } = await supabase.from('messages').select('*').eq('receiver', activeEmployee.username).eq('sender', 'admin');
+            let { data } = await db.from('messages').select('*').eq('receiver', activeEmployee.username).eq('sender', 'admin');
             if (data && data.length > 0) {
                 document.getElementById('employee-notification-alert').classList.remove('hidden');
             }
