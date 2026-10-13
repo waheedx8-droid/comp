@@ -30,8 +30,8 @@
         const SUPABASE_URL = "YOUR_SUPABASE_URL";
         const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
         
-        // تهيئة العميل بمتغير مختلف تماماً لعدم حدوث أي تداخل
-        const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // استخدام كائن نافذة مستقل تماماً لمنع أي تداخل في الأسماء
+        const mySupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         async function handleLogin() {
             let u = document.getElementById('login-user').value.trim();
@@ -47,7 +47,7 @@
 
             try {
                 // 1. التحقق من جدول الآدمن
-                let { data: adminData, error: adminErr } = await dbClient
+                let { data: adminData } = await mySupabase
                     .from('admin')
                     .select('*')
                     .eq('username', u)
@@ -61,7 +61,7 @@
                 }
 
                 // 2. التحقق من جدول الموظفين
-                let { data: empData, error: empErr } = await dbClient
+                let { data: empData } = await mySupabase
                     .from('employees')
                     .select('*')
                     .eq('username', u)
