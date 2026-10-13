@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تسجيل الدخول - نظام إدارة الدوام الشامل</title>
+    <!-- استدعاء مكتبة Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; height: 100vh; }
@@ -25,37 +26,59 @@
     </div>
 
     <script>
+        // ضع هنا رابط ومفتاح مشروعك الحقيقيين من Supabase
         const SUPABASE_URL = "YOUR_SUPABASE_URL";
         const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // تهيئة العميل بمتغير مختلف تماماً لعدم حدوث أي تداخل
+        const dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         async function handleLogin() {
             let u = document.getElementById('login-user').value.trim();
             let p = document.getElementById('login-pass').value.trim();
-            if (!u || !p) { alert('الرجاء إدخال اسم المستخدم وكلمة المرور!'); return; }
-
             let msg = document.getElementById('loading-msg');
+
+            if (!u || !p) {
+                alert('الرجاء إدخال اسم المستخدم وكلمة المرور!');
+                return;
+            }
+
             msg.style.display = 'block';
 
             try {
-                let { data: admin } = await supabase.from('admin').select('*').eq('username', u).eq('password', p).single();
-                if (admin) {
+                // 1. التحقق من جدول الآدمن
+                let { data: adminData, error: adminErr } = await dbClient
+                    .from('admin')
+                    .select('*')
+                    .eq('username', u)
+                    .eq('password', p)
+                    .maybeSingle();
+
+                if (adminData) {
                     localStorage.setItem('hr_logged_role', 'admin');
                     window.location.href = 'admin.html';
                     return;
                 }
 
-                let { data: emp } = await supabase.from('employees').select('*').eq('username', u).eq('password', p).single();
-                if (emp) {
+                // 2. التحقق من جدول الموظفين
+                let { data: empData, error: empErr } = await dbClient
+                    .from('employees')
+                    .select('*')
+                    .eq('username', u)
+                    .eq('password', p)
+                    .maybeSingle();
+
+                if (empData) {
                     localStorage.setItem('hr_logged_role', 'employee');
-                    localStorage.setItem('hr_logged_emp_id', emp.id);
+                    localStorage.setItem('hr_logged_emp_id', empData.id);
                     window.location.href = 'employee.html';
                     return;
                 }
 
                 alert('اسم المستخدم أو كلمة المرور غير صحيحة!');
-            } catch (e) {
-                alert('خطأ في الاتصال بقاعدة البيانات.');
+            } catch (err) {
+                console.error("خطأ في تسجيل الدخول:", err);
+                alert('حدث خطأ أثناء الاتصال بقاعدة البيانات.');
             } finally {
                 msg.style.display = 'none';
             }
