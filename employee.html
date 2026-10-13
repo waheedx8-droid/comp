@@ -315,7 +315,7 @@
             let mapLink = activeEmployee.current_lat ? `https://www.google.com/maps?q=${activeEmployee.current_lat},${activeEmployee.current_lon}` : null;
 
             let { error: historyErr } = await db.from('attendance_history').insert([{
-                employee_id: empId,
+                employee_id: String(empId),
                 work_date: startDateStr,
                 start_time: startTimeStr,
                 end_time: endTimeStr,
@@ -324,7 +324,8 @@
             }]);
 
             if (historyErr) {
-                alert('حدث خطأ أثناء حفظ السجل.');
+                console.error("خطأ تفصيلي من قاعدة البيانات:", historyErr);
+                alert('فشل حفظ السجل في قاعدة البيانات: ' + historyErr.message);
                 return;
             }
 
@@ -385,7 +386,17 @@
 
         async function loadAttendanceHistory() {
             let tbody = document.getElementById('attendance-history-body');
-            let { data: history } = await db.from('attendance_history').select('*').eq('employee_id', empId).order('created_at', { ascending: false });
+            let { data: history, error } = await db
+                .from('attendance_history')
+                .select('*')
+                .eq('employee_id', String(empId))
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error("خطأ في جلب السجلات:", error.message);
+                tbody.innerHTML = '<tr><td colspan="5" style="color: red;">خطأ في تحميل السجلات.</td></tr>';
+                return;
+            }
 
             if (!history || history.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" style="color: gray;">لا توجد سجلات سابقة.</td></tr>';
@@ -397,10 +408,10 @@
                 let mapBtn = item.location ? `<a href="${item.location}" target="_blank" style="color:#3498db; font-weight:bold;">خريطة 🗺️</a>` : 'غير متاح';
                 tbody.innerHTML += `
                     <tr>
-                        <td><b>${item.work_date}</b></td>
-                        <td style="color:green;">${item.start_time}</td>
-                        <td style="color:red;">${item.end_time}</td>
-                        <td><b>${item.total_hours}</b></td>
+                        <td><b>${item.work_date || '-'}</b></td>
+                        <td style="color:green;">${item.start_time || '-'}</td>
+                        <td style="color:red;">${item.end_time || '-'}</td>
+                        <td><b>${item.total_hours || '-'}</b></td>
                         <td>${mapBtn}</td>
                     </tr>
                 `;
