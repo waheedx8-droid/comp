@@ -57,6 +57,7 @@
             <p id="gps-status-label" style="font-size: 12px; color: gray; margin: 5px 0 0 0; text-align: center;">حالة الموقع: لم يتم التفعيل بعد</p>
         </div>
 
+        <!-- قسم إدارة حساب الموظف من قبل الآدمن -->
         <div id="admin-edit-employee-section" class="hidden" style="background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h3 style="margin:0; color: #2980b9;">⚙️ إدارة حساب وراتب هذا الموظف</h3>
@@ -281,14 +282,16 @@
             }
 
             let now = new Date();
-            let startObj = {
-                startTimeEpoch: now.getTime(),
-                startDateStr: now.toLocaleDateString(),
-                startTimeStr: now.toLocaleTimeString()
-            };
-            localStorage.setItem(`temp_start_${empId}`, JSON.stringify(startObj));
+            let { error } = await db.from('employees').update({
+                status: 'على رأس العمل',
+                created_at: now.toISOString()
+            }).eq('id', empId);
 
-            await db.from('employees').update({ status: 'على رأس العمل' }).eq('id', empId);
+            if (error) {
+                alert('حدث خطأ أثناء تسجيل الحضور.');
+                return;
+            }
+
             alert('تم تسجيل الحضور بنجاح 🟢');
             fetchEmployeeData();
         }
@@ -297,29 +300,41 @@
             if (role === 'admin') return;
             if (watchId !== null) navigator.geolocation.clearWatch(watchId);
 
-            let startData = JSON.parse(localStorage.getItem(`temp_start_${empId}`));
-            if (!startData) { alert('لا يوجد حضور نشط مسجل.'); return; }
-
             let now = new Date();
+            let startTimeObj = new Date(activeEmployee.created_at || now);
+            
             let endTimeStr = now.toLocaleTimeString();
-            let totalSec = Math.floor((now.getTime() - startData.startTimeEpoch) / 1000);
+            let startDateStr = startTimeObj.toLocaleDateString();
+            let startTimeStr = startTimeObj.toLocaleTimeString();
+
+            let totalSec = Math.floor((now.getTime() - startTimeObj.getTime()) / 1000);
+            if (totalSec < 0) totalSec = 0;
+            
             let totalHoursStr = `${Math.floor(totalSec / 3600)}س ${Math.floor((totalSec % 3600) / 60)}د ${totalSec % 60}ث`;
 
             let mapLink = activeEmployee.current_lat ? `https://www.google.com/maps?q=${activeEmployee.current_lat},${activeEmployee.current_lon}` : null;
 
-            await db.from('attendance_history').insert([{
+            let { error: historyErr } = await db.from('attendance_history').insert([{
                 employee_id: empId,
-                work_date: startData.startDateStr,
-                start_time: startData.startTimeStr,
+                work_date: startDateStr,
+                start_time: startTimeStr,
                 end_time: endTimeStr,
                 total_hours: totalHoursStr,
                 location: mapLink
             }]);
 
-            await db.from('employees').update({ status: 'منصرف', current_lat: null, current_lon: null }).eq('id', empId);
-            localStorage.removeItem(`temp_start_${empId}`);
-            stopTimer();
+            if (historyErr) {
+                alert('حدث خطأ أثناء حفظ السجل.');
+                return;
+            }
 
+            await db.from('employees').update({ 
+                status: 'منصرف', 
+                current_lat: null, 
+                current_lon: null 
+            }).eq('id', empId);
+
+            stopTimer();
             alert('تم تسجيل الانصراف وحفظ السجل بنجاح!');
             fetchEmployeeData();
         }
@@ -345,15 +360,22 @@
 
         function startTimerEngine() {
             stopTimer();
-            let startData = JSON.parse(localStorage.getItem(`temp_start_${empId}`));
-            if (activeEmployee.status !== 'على رأس العمل' || !startData) return;
+            if (activeEmployee.status !== 'على رأس العمل' || !activeEmployee.created_at) return;
+
+            let startTimeEpoch = new Date(activeEmployee.created_at).getTime();
 
             timerInterval = setInterval(() => {
-                let diffSec = Math.floor((new Date().getTime() - startData.startTimeEpoch) / 1000);
+                let diffSec = Math.floor((new Date().getTime() - startTimeEpoch) / 1000);
+                if (diffSec < 0) diffSec = 0;
+                
                 let h = String(Math.floor(diffSec / 3600)).padStart(2, '0');
                 let m = String(Math.floor((diffSec % 3600) / 60)).padStart(2, '0');
                 let s = String(diffSec % 60).padStart(2, '0');
-                document.getElementById('timer-display').innerText = `${h}:${m}:${s}`;
+                
+                let timerElem = document.getElementById('timer-display');
+                if (timerElem) {
+                    timerElem.innerText = `${h}:${m}:${s}`;
+                }
             }, 1000);
         }
 
