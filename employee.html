@@ -104,7 +104,6 @@
                         <th>الدخول</th>
                         <th>الانصراف</th>
                         <th>الإجمالي</th>
-                        <th>الموقع</th>
                     </tr>
                 </thead>
                 <tbody id="attendance-history-body"></tbody>
@@ -163,8 +162,11 @@
             }
 
             if (activeEmployee.current_lat && activeEmployee.current_lon) {
-                document.getElementById('gps-status-label').innerText = "حالة الموقع: مفعل وجاهز ✅";
-                document.getElementById('gps-status-label').style.color = "green";
+                let statusLabel = document.getElementById('gps-status-label');
+                if (statusLabel) {
+                    statusLabel.innerText = "حالة الموقع: مفعل وجاهز للعرض ✅";
+                    statusLabel.style.color = "green";
+                }
             }
 
             updateAttendanceUI();
@@ -184,16 +186,31 @@
         }
 
         function enableEmployeeLocation() {
-            if (!navigator.geolocation) { alert('متصفحك لا يدعم تحديد الموقع.'); return; }
+            if (!navigator.geolocation) { 
+                alert('متصفحك لا يدعم تحديد الموقع.'); 
+                return; 
+            }
             navigator.geolocation.getCurrentPosition(async (pos) => {
+                let lat = pos.coords.latitude;
+                let lon = pos.coords.longitude;
+                
                 await db.from('employees').update({
-                    current_lat: pos.coords.latitude,
-                    current_lon: pos.coords.longitude
+                    current_lat: lat,
+                    current_lon: lon
                 }).eq('id', empId);
-                document.getElementById('gps-status-label').innerText = "حالة الموقع: مفعل بنجاح ✅";
-                document.getElementById('gps-status-label').style.color = "green";
+
+                activeEmployee.current_lat = lat;
+                activeEmployee.current_lon = lon;
+
+                let statusLabel = document.getElementById('gps-status-label');
+                if (statusLabel) {
+                    statusLabel.innerText = "حالة الموقع: مفعل وجاهز للعرض ✅";
+                    statusLabel.style.color = "green";
+                }
                 alert('تم تفعيل ومشاركة موقعك بنجاح 📍');
-            }, () => { alert('فشل تفعيل الموقع.'); });
+            }, () => { 
+                alert('فشل الحصول على الموقع.'); 
+            }, { enableHighAccuracy: true });
         }
 
         function trackLiveLocation() {
@@ -312,15 +329,13 @@
             
             let totalHoursStr = `${Math.floor(totalSec / 3600)}س ${Math.floor((totalSec % 3600) / 60)}د ${totalSec % 60}ث`;
 
-            let mapLink = activeEmployee.current_lat ? `https://www.google.com/maps?q=${activeEmployee.current_lat},${activeEmployee.current_lon}` : null;
-
+            // حفظ السجل التاريخي بدون إرسال الموقع
             let { error: historyErr } = await db.from('attendance_history').insert([{
                 employee_id: String(empId),
                 work_date: startDateStr,
                 start_time: startTimeStr,
                 end_time: endTimeStr,
-                total_hours: totalHoursStr,
-                location: mapLink
+                total_hours: totalHoursStr
             }]);
 
             if (historyErr) {
@@ -394,25 +409,23 @@
 
             if (error) {
                 console.error("خطأ في جلب السجلات:", error.message);
-                tbody.innerHTML = '<tr><td colspan="5" style="color: red;">خطأ في تحميل السجلات.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" style="color: red;">خطأ في تحميل السجلات.</td></tr>';
                 return;
             }
 
             if (!history || history.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="color: gray;">لا توجد سجلات سابقة.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" style="color: gray;">لا توجد سجلات سابقة.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = '';
             history.forEach(item => {
-                let mapBtn = item.location ? `<a href="${item.location}" target="_blank" style="color:#3498db; font-weight:bold;">خريطة 🗺️</a>` : 'غير متاح';
                 tbody.innerHTML += `
                     <tr>
                         <td><b>${item.work_date || '-'}</b></td>
                         <td style="color:green;">${item.start_time || '-'}</td>
                         <td style="color:red;">${item.end_time || '-'}</td>
                         <td><b>${item.total_hours || '-'}</b></td>
-                        <td>${mapBtn}</td>
                     </tr>
                 `;
             });
