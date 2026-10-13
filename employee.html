@@ -27,7 +27,7 @@
         th, td { padding: 12px; text-align: center; border-bottom: 1px solid #ddd; }
         th { background-color: #f8f9fa; }
         .chat-box { background: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; height: 200px; overflow-y: auto; margin-bottom: 10px; display: flex; flex-direction: column; }
-        .message-bubble { max-width: 75%; padding: 10px 14px; margin: 6px 0; border-radius: 10px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        .message-bubble { max-width: 75%; padding: 10px 14px; margin: 6px 0; border-radius: 10px; font-size: 14px; line-height: 1.4; word-wrap: break-word; position: relative; }
         .msg-incoming { background: #e1f5fe; align-self: flex-start; border-bottom-right-radius: 0; }
         .msg-outgoing { background: #d1e7dd; align-self: flex-end; border-bottom-left-radius: 0; }
         .msg-time { font-size: 10px; color: #777; display: block; margin-top: 4px; text-align: left; }
@@ -104,8 +104,13 @@
             </table>
         </div>
 
-        <h3 style="margin-top: 30px;">المحادثة المباشرة مع الإدارة</h3>
-        <div class="chat-box" id="chat-messages-box"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
+            <h3 style="margin:0;">المحادثة المباشرة مع الإدارة</h3>
+            <!-- زر حذف المحادثة يظهر للآدمن فقط -->
+            <button id="btn-delete-chat" onclick="clearEmployeeChat()" class="btn-danger hidden" style="width: auto; padding: 6px 12px; font-size: 13px; margin:0;">🗑️ حذف المحادثة بالكامل</button>
+        </div>
+        
+        <div class="chat-box" id="chat-messages-box" style="margin-top: 10px;"></div>
         <div style="display: flex; gap: 10px;">
             <input type="text" id="chat-input-text" placeholder="اكتب رسالتك هنا..." style="margin:0;" onkeypress="if(event.key === 'Enter') sendChatMessage()">
             <button onclick="sendChatMessage()" style="width: 120px; margin:0;">إرسال</button>
@@ -143,6 +148,7 @@
             let liveLocBox = document.getElementById('admin-live-location-box');
             let empGpsBox = document.getElementById('employee-gps-box');
             let thActionHeader = document.getElementById('th-action-header');
+            let btnDeleteChat = document.getElementById('btn-delete-chat');
 
             if (role === 'admin') {
                 editSection.classList.remove('hidden');
@@ -150,12 +156,14 @@
                 if (liveLocBox) liveLocBox.classList.remove('hidden');
                 if (empGpsBox) empGpsBox.style.display = 'none';
                 if (thActionHeader) thActionHeader.classList.remove('hidden');
+                if (btnDeleteChat) btnDeleteChat.classList.remove('hidden'); // إظهار زر حذف المحادثة للآدمن فقط
                 applyEditingState();
             } else {
                 editSection.classList.add('hidden');
                 if (liveLocBox) liveLocBox.classList.add('hidden');
                 if (empGpsBox) empGpsBox.style.display = 'block';
                 if (thActionHeader) thActionHeader.classList.add('hidden');
+                if (btnDeleteChat) btnDeleteChat.classList.add('hidden'); // إخفاء زر حذف المحادثة عن الموظف
             }
 
             if (activeEmployee.current_lat && activeEmployee.current_lon) {
@@ -393,18 +401,25 @@
 
         async function loadChatMessages() {
             let box = document.getElementById('chat-messages-box');
+            if (!activeEmployee || !activeEmployee.username) return;
+
             let { data: messages, error } = await db.from('messages').select('*');
 
             if (error) {
-                console.error("خطأ المحادثة:", error);
+                console.error("خطأ في جلب المحادثة:", error);
+                box.innerHTML = '<p style="color: red; text-align: center; margin: auto;">خطأ في تحميل الرسائل.</p>';
                 return;
             }
 
             box.innerHTML = '';
-            let filtered = messages ? messages.filter(m => m.receiver === activeEmployee.username || m.sender === activeEmployee.username || m.receiver === 'all') : [];
+            let filtered = messages ? messages.filter(m => 
+                m.receiver === activeEmployee.username || 
+                m.sender === activeEmployee.username || 
+                m.receiver === 'all'
+            ) : [];
 
             if (filtered.length === 0) {
-                box.innerHTML = '<p style="color: gray; text-align: center; margin: auto;">لا توجد رسائل سابقة.</p>';
+                box.innerHTML = '<p style="color: gray; text-align: center; margin: auto;">لا توجد رسائل سابقة في هذه المحادثة.</p>';
                 return;
             }
 
@@ -429,10 +444,10 @@
         async function sendChatMessage() {
             let input = document.getElementById('chat-input-text');
             let text = input.value.trim();
-            if (!text) return;
+            if (!text || !activeEmployee) return;
 
-            let sender = role === 'admin' ? 'admin' : activeEmployee.username;
-            let receiver = role === 'admin' ? activeEmployee.username : 'admin';
+            let sender = (role === 'admin') ? 'admin' : activeEmployee.username;
+            let receiver = (role === 'admin') ? activeEmployee.username : 'admin';
 
             let { error } = await db.from('messages').insert([{
                 sender: sender,
@@ -447,6 +462,23 @@
             }
 
             input.value = '';
+            loadChatMessages();
+        }
+
+        // دالة حذف محادثة هذا الموظف بالكامل (للآدمن فقط)
+        async function clearEmployeeChat() {
+            if (role !== 'admin') return;
+            if (!confirm('هل أنت متأكد من حذف جميع رسائل هذه المحادثة نهائياً؟')) return;
+
+            // جلب الرسائل الخاصة بهذا الموظف لحذفها
+            let { data: messages } = await db.from('messages').select('*');
+            let targetMessages = messages ? messages.filter(m => m.receiver === activeEmployee.username || m.sender === activeEmployee.username) : [];
+
+            for (let msg of targetMessages) {
+                await db.from('messages').delete().eq('id', msg.id);
+            }
+
+            alert('تم حذف المحادثة بنجاح!');
             loadChatMessages();
         }
 
