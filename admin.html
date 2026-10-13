@@ -78,9 +78,9 @@
     </div>
 
     <script>
-        const SUPABASE_URL = "YOUR_SUPABASE_URL";
-        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const SUPABASE_URL = "https://sthvmzkmfifdujdxzujw.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_OWPdd4ardgX3jLJzjmuk1A_C8mNTvhn";
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         if (localStorage.getItem('hr_logged_role') !== 'admin') {
             window.location.href = 'index.html';
@@ -102,14 +102,14 @@
         async function saveAdminPassword() {
             let newPass = document.getElementById('new-admin-pass').value.trim();
             if (!newPass) { alert('الرجاء إدخال كلمة المرور'); return; }
-            let { error } = await supabase.from('admin').update({ password: newPass }).eq('username', 'admin');
+            let { error } = await db.from('admin').update({ password: newPass }).eq('username', 'admin');
             if (error) alert('حدث خطأ'); else { alert('تم الحفظ بنجاح!'); toggleAdminPasswordSection(); }
         }
 
         async function loadAdminDashboard() {
             let tbody = document.getElementById('employees-table-body');
-            let { data: employees } = await supabase.from('employees').select('*');
-            let { data: messages } = await supabase.from('messages').select('*').eq('receiver', 'admin').eq('read_by_admin', false);
+            let { data: employees } = await db.from('employees').select('*');
+            let { data: messages } = await db.from('messages').select('*').eq('receiver', 'admin').eq('read_by_admin', false);
 
             if (messages && messages.length > 0) {
                 document.getElementById('admin-notification-alert').classList.remove('hidden');
@@ -142,7 +142,7 @@
         }
 
         async function dismissAdminNotification() {
-            await supabase.from('messages').update({ read_by_admin: true }).eq('receiver', 'admin');
+            await db.from('messages').update({ read_by_admin: true }).eq('receiver', 'admin');
             document.getElementById('admin-notification-alert').classList.add('hidden');
             loadAdminDashboard();
         }
@@ -155,7 +155,7 @@
 
             if (!name || !user || !pass) { alert('الرجاء تعبئة الحقول الأساسية'); return; }
 
-            let { error } = await supabase.from('employees').insert([{ name, username: user, password: pass, salary }]);
+            let { error } = await db.from('employees').insert([{ name, username: user, password: pass, salary }]);
             if (error) alert('اسم المستخدم مستخدم مسبقاً'); else {
                 alert('تم إضافة الموظف بنجاح!');
                 document.getElementById('new-emp-name').value = '';
@@ -170,7 +170,7 @@
             let text = document.getElementById('admin-broadcast-text').value.trim();
             if (!text) return;
 
-            await supabase.from('messages').insert([{
+            await db.from('messages').insert([{
                 sender: 'admin',
                 receiver: 'all',
                 text: text,
