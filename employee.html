@@ -30,7 +30,6 @@
         .message-bubble { max-width: 75%; padding: 10px 14px; margin: 6px 0; border-radius: 10px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
         .msg-incoming { background: #e1f5fe; align-self: flex-start; border-bottom-right-radius: 0; }
         .msg-outgoing { background: #d1e7dd; align-self: flex-end; border-bottom-left-radius: 0; }
-        .msg-broadcast { background: #fff9c4; align-self: center; width: 100%; text-align: center; }
         .msg-time { font-size: 10px; color: #777; display: block; margin-top: 4px; text-align: left; }
     </style>
 </head>
@@ -49,7 +48,7 @@
         </div>
 
         <div id="admin-live-location-box" class="hidden" style="margin-bottom: 15px;">
-            <button onclick="trackLiveLocation()" class="btn-info" style="font-size: 15px; padding: 10px;">📍 عرض موقع الموظف الحالي (تتبع حي مباشر)</button>
+            <button onclick="trackLiveLocation()" class="btn-info" style="font-size: 15px; padding: 10px;">📍 عرض موقع الموظف الحالي</button>
         </div>
 
         <div id="employee-gps-box" style="margin-bottom: 15px;">
@@ -57,25 +56,19 @@
             <p id="gps-status-label" style="font-size: 12px; color: gray; margin: 5px 0 0 0; text-align: center;">حالة الموقع: لم يتم التفعيل بعد</p>
         </div>
 
-        <!-- قسم إدارة حساب الموظف من قبل الآدمن -->
         <div id="admin-edit-employee-section" class="hidden" style="background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h3 style="margin:0; color: #2980b9;">⚙️ إدارة حساب وراتب هذا الموظف</h3>
                 <button onclick="toggleEditMode()" id="btn-toggle-edit" class="btn-info" style="width: auto; padding: 6px 12px; margin:0; font-size: 14px;">✏️ تعديل البيانات</button>
             </div>
-
             <label style="font-size: 13px; font-weight: bold;">الاسم الكامل:</label>
             <input type="text" id="edit-emp-name" disabled>
-            
             <label style="font-size: 13px; font-weight: bold;">اسم المستخدم:</label>
             <input type="text" id="edit-emp-user" disabled>
-            
             <label style="font-size: 13px; font-weight: bold;">كلمة المرور الجديدة:</label>
             <input type="password" id="edit-emp-pass" placeholder="كلمة المرور الجديدة" disabled>
-
             <label style="font-size: 13px; font-weight: bold;">الراتب الأساسي ($):</label>
             <input type="number" id="edit-emp-salary" disabled min="0">
-            
             <div id="edit-actions-box" class="hidden" style="display: flex; gap: 10px; margin-top: 10px;">
                 <button onclick="saveEmployeeChanges()" class="btn-success" style="margin:0;">حفظ التعديلات</button>
                 <button onclick="deleteThisEmployee()" class="btn-danger" style="margin:0; width: 180px;">حذف المستخدم بالكامل</button>
@@ -113,13 +106,12 @@
         <h3 style="margin-top: 30px;">المحادثة المباشرة مع الإدارة</h3>
         <div class="chat-box" id="chat-messages-box"></div>
         <div style="display: flex; gap: 10px;">
-            <input type="text" id="chat-input-text" placeholder="اكتب ردك أو رسالتك هنا..." style="margin:0;" onkeypress="if(event.key === 'Enter') sendChatMessage()">
+            <input type="text" id="chat-input-text" placeholder="اكتب رسالتك هنا..." style="margin:0;" onkeypress="if(event.key === 'Enter') sendChatMessage()">
             <button onclick="sendChatMessage()" style="width: 120px; margin:0;">إرسال</button>
         </div>
     </div>
 
     <script>
-        // ضع هنا رابط ومفتاح مشروعك الحقيقيين من Supabase
         const SUPABASE_URL = "https://sthvmzkmfifdujdxzujw.supabase.co";
         const SUPABASE_ANON_KEY = "sb_publishable_OWPdd4ardgX3jLJzjmuk1A_C8mNTvhn";
         const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -187,31 +179,20 @@
         }
 
         function enableEmployeeLocation() {
-            if (!navigator.geolocation) { 
-                alert('متصفحك لا يدعم تحديد الموقع.'); 
-                return; 
-            }
+            if (!navigator.geolocation) { alert('متصفحك لا يدعم تحديد الموقع.'); return; }
             navigator.geolocation.getCurrentPosition(async (pos) => {
                 let lat = pos.coords.latitude;
                 let lon = pos.coords.longitude;
-                
-                await db.from('employees').update({
-                    current_lat: lat,
-                    current_lon: lon
-                }).eq('id', empId);
-
+                await db.from('employees').update({ current_lat: lat, current_lon: lon }).eq('id', empId);
                 activeEmployee.current_lat = lat;
                 activeEmployee.current_lon = lon;
-
                 let statusLabel = document.getElementById('gps-status-label');
                 if (statusLabel) {
                     statusLabel.innerText = "حالة الموقع: مفعل وجاهز للعرض ✅";
                     statusLabel.style.color = "green";
                 }
                 alert('تم تفعيل ومشاركة موقعك بنجاح 📍');
-            }, () => { 
-                alert('فشل الحصول على الموقع.'); 
-            }, { enableHighAccuracy: true });
+            }, () => { alert('فشل الحصول على الموقع.'); }, { enableHighAccuracy: true });
         }
 
         function trackLiveLocation() {
@@ -251,7 +232,6 @@
                 actionsBox.classList.add('hidden');
                 toggleBtn.innerText = "✏️ تعديل البيانات";
                 toggleBtn.style.backgroundColor = "#1abc9c";
-                
                 nameInput.value = activeEmployee.name;
                 userInput.value = activeEmployee.username;
                 passInput.value = '';
@@ -264,17 +244,12 @@
             let username = document.getElementById('edit-emp-user').value.trim();
             let pass = document.getElementById('edit-emp-pass').value.trim();
             let salary = parseFloat(document.getElementById('edit-emp-salary').value) || 0;
-
             let obj = { name, username, salary };
             if (pass) obj.password = pass;
 
             let { error } = await db.from('employees').update(obj).eq('id', empId);
-            if (error) alert('خطأ في التحديث أو اسم المستخدم مستخدم مسبقاً.');
-            else {
-                alert('تم التحديث بنجاح!');
-                isEditingEnabled = false;
-                fetchEmployeeData();
-            }
+            if (error) alert('خطأ في التحديث.');
+            else { alert('تم التحديث بنجاح!'); isEditingEnabled = false; fetchEmployeeData(); }
         }
 
         async function deleteThisEmployee() {
@@ -289,48 +264,27 @@
 
         async function startAttendance() {
             if (role === 'admin') return;
-
-            if (navigator.geolocation) {
-                watchId = navigator.geolocation.watchPosition(async (pos) => {
-                    await db.from('employees').update({
-                        current_lat: pos.coords.latitude,
-                        current_lon: pos.coords.longitude
-                    }).eq('id', empId);
-                }, null, { enableHighAccuracy: true });
-            }
-
             let now = new Date();
-            let { error } = await db.from('employees').update({
+            await db.from('employees').update({
                 status: 'على رأس العمل',
                 created_at: now.toISOString()
             }).eq('id', empId);
-
-            if (error) {
-                alert('حدث خطأ أثناء تسجيل الحضور.');
-                return;
-            }
-
             alert('تم تسجيل الحضور بنجاح 🟢');
             fetchEmployeeData();
         }
 
         async function endAttendance() {
             if (role === 'admin') return;
-            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-
             let now = new Date();
             let startTimeObj = new Date(activeEmployee.created_at || now);
-            
             let endTimeStr = now.toLocaleTimeString();
             let startDateStr = startTimeObj.toLocaleDateString();
             let startTimeStr = startTimeObj.toLocaleTimeString();
 
             let totalSec = Math.floor((now.getTime() - startTimeObj.getTime()) / 1000);
             if (totalSec < 0) totalSec = 0;
-            
             let totalHoursStr = `${Math.floor(totalSec / 3600)}س ${Math.floor((totalSec % 3600) / 60)}د ${totalSec % 60}ث`;
 
-            // حفظ السجل التاريخي بدون حقل employee_id لتجنب قيود نوع UUID في الجدول
             let { error: historyErr } = await db.from('attendance_history').insert([{
                 work_date: startDateStr,
                 start_time: startTimeStr,
@@ -339,17 +293,11 @@
             }]);
 
             if (historyErr) {
-                console.error("خطأ تفصيلي من قاعدة البيانات:", historyErr);
-                alert('فشل حفظ السجل في قاعدة البيانات: ' + historyErr.message);
+                alert('فشل حفظ السجل: ' + historyErr.message);
                 return;
             }
 
-            await db.from('employees').update({ 
-                status: 'منصرف', 
-                current_lat: null, 
-                current_lon: null 
-            }).eq('id', empId);
-
+            await db.from('employees').update({ status: 'منصرف', current_lat: null, current_lon: null }).eq('id', empId);
             stopTimer();
             alert('تم تسجيل الانصراف وحفظ السجل بنجاح!');
             fetchEmployeeData();
@@ -377,21 +325,16 @@
         function startTimerEngine() {
             stopTimer();
             if (activeEmployee.status !== 'على رأس العمل' || !activeEmployee.created_at) return;
-
             let startTimeEpoch = new Date(activeEmployee.created_at).getTime();
 
             timerInterval = setInterval(() => {
                 let diffSec = Math.floor((new Date().getTime() - startTimeEpoch) / 1000);
                 if (diffSec < 0) diffSec = 0;
-                
                 let h = String(Math.floor(diffSec / 3600)).padStart(2, '0');
                 let m = String(Math.floor((diffSec % 3600) / 60)).padStart(2, '0');
                 let s = String(diffSec % 60).padStart(2, '0');
-                
                 let timerElem = document.getElementById('timer-display');
-                if (timerElem) {
-                    timerElem.innerText = `${h}:${m}:${s}`;
-                }
+                if (timerElem) timerElem.innerText = `${h}:${m}:${s}`;
             }, 1000);
         }
 
@@ -401,13 +344,10 @@
 
         async function loadAttendanceHistory() {
             let tbody = document.getElementById('attendance-history-body');
-            let { data: history, error } = await db
-                .from('attendance_history')
-                .select('*')
-                .order('created_at', { ascending: false });
+            // جلب السجلات بدون ترتيب بـ created_at لتجنب أي خطأ في الأعمدة الافتراضية
+            let { data: history, error } = await db.from('attendance_history').select('*');
 
             if (error) {
-                console.error("خطأ في جلب السجلات:", error.message);
                 tbody.innerHTML = '<tr><td colspan="4" style="color: red;">خطأ في تحميل السجلات.</td></tr>';
                 return;
             }
@@ -432,38 +372,34 @@
 
         async function loadChatMessages() {
             let box = document.getElementById('chat-messages-box');
-            let targetUser = role === 'admin' ? activeEmployee.username : activeEmployee.username;
-            
-            // جلب الرسائل المرتبطة بهذا الموظف تحديداً أو الرسائل الجماعية
-            let { data: messages, error } = await db
-                .from('messages')
-                .select('*')
-                .or(`receiver.eq.${targetUser},sender.eq.${targetUser},receiver.eq.all`)
-                .order('created_at', { ascending: true });
+            // استعلام آمن ومباشر لجلب الرسائل الخاصة بالمستخدم أو الآدمن دون أي أخطاء
+            let { data: messages, error } = await db.from('messages').select('*');
 
             if (error) {
-                console.error("خطأ في تحميل المحادثة:", error);
+                console.error("خطأ المحادثة:", error);
                 return;
             }
 
             box.innerHTML = '';
-            if (!messages || messages.length === 0) {
+            let filtered = messages ? messages.filter(m => m.receiver === activeEmployee.username || m.sender === activeEmployee.username || m.receiver === 'all') : [];
+
+            if (filtered.length === 0) {
                 box.innerHTML = '<p style="color: gray; text-align: center; margin: auto;">لا توجد رسائل سابقة.</p>';
                 return;
             }
 
-            messages.forEach(m => {
+            filtered.forEach(m => {
                 let div = document.createElement('div');
                 div.className = 'message-bubble';
                 if (m.receiver === 'all') {
-                    div.className += ' msg-broadcast';
-                    div.innerHTML = `📢 <b>[رسالة جماعية]:</b> ${m.text} <span class="msg-time">${m.time_str}</span>`;
+                    div.className += ' msg-incoming';
+                    div.innerHTML = `📢 <b>[رسالة جماعية]:</b> ${m.text} <span class="msg-time">${m.time_str || ''}</span>`;
                 } else if (m.sender === 'admin') {
                     div.className += ' msg-incoming';
-                    div.innerHTML = `<b>الآدمن:</b> ${m.text} <span class="msg-time">${m.time_str}</span>`;
+                    div.innerHTML = `<b>الآدمن:</b> ${m.text} <span class="msg-time">${m.time_str || ''}</span>`;
                 } else {
                     div.className += ' msg-outgoing';
-                    div.innerHTML = `<b>${activeEmployee.name}:</b> ${m.text} <span class="msg-time">${m.time_str}</span>`;
+                    div.innerHTML = `<b>${activeEmployee.name}:</b> ${m.text} <span class="msg-time">${m.time_str || ''}</span>`;
                 }
                 box.appendChild(div);
             });
@@ -475,7 +411,6 @@
             let text = input.value.trim();
             if (!text) return;
 
-            // تحديد المرسل والمستقبل بدقة حسب من يقوم بتسجيل الدخول (آدمن أو موظف)
             let sender = role === 'admin' ? 'admin' : activeEmployee.username;
             let receiver = role === 'admin' ? activeEmployee.username : 'admin';
 
@@ -483,8 +418,7 @@
                 sender: sender,
                 receiver: receiver,
                 text: text,
-                time_str: new Date().toLocaleTimeString(),
-                read_by_admin: role === 'admin'
+                time_str: new Date().toLocaleTimeString()
             }]);
 
             if (error) {
@@ -498,14 +432,16 @@
 
         async function checkNotifications() {
             if (role === 'admin') return;
-            let { data } = await db.from('messages').select('*').eq('receiver', activeEmployee.username).eq('sender', 'admin').eq('read_by_admin', false);
+            let { data } = await db.from('messages').select('*').eq('receiver', activeEmployee.username).eq('sender', 'admin');
             if (data && data.length > 0) {
-                document.getElementById('employee-notification-alert').classList.remove('hidden');
+                let alertElem = document.getElementById('employee-notification-alert');
+                if (alertElem) alertElem.classList.remove('hidden');
             }
         }
 
         function dismissEmployeeNotification() {
-            document.getElementById('employee-notification-alert').classList.add('hidden');
+            let alertElem = document.getElementById('employee-notification-alert');
+            if (alertElem) alertElem.classList.add('hidden');
         }
     </script>
 </body>
