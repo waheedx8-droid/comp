@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة الموظف - نظام إدارة الدوام</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2, h3 { color: #2c3e50; }
+        input, select, button, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+        input:disabled { background-color: #e9ecef; color: #6c757d; cursor: not-allowed; border-color: #ced4da; }
+        button { background-color: #3498db; color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.3s; }
+        button:hover { background-color: #2980b9; }
+        .btn-danger { background-color: #e74c3c; }
+        .btn-danger:hover { background-color: #c0392b; }
+        .btn-success { background-color: #2ecc71; }
+        .btn-success:hover { background-color: #27ae60; }
+        .btn-warning { background-color: #e67e22; color: white; }
+        .btn-warning:hover { background-color: #d35400; }
+        .btn-info { background-color: #1abc9c; color: white; }
+        .btn-info:hover { background-color: #16a085; }
+        .hidden { display: none !important; }
+        .notification-banner { background-color: #e74c3c; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: center; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; }
+        .chat-box { background: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; height: 200px; overflow-y: auto; margin-bottom: 10px; display: flex; flex-direction: column; }
+        .message-bubble { max-width: 75%; padding: 10px 14px; margin: 6px 0; border-radius: 10px; font-size: 14px; line-height: 1.4; word-wrap: break-word; }
+        .msg-incoming { background: #e1f5fe; align-self: flex-start; border-bottom-right-radius: 0; }
+        .msg-outgoing { background: #d1e7dd; align-self: flex-end; border-bottom-left-radius: 0; }
+        .msg-broadcast { background: #fff9c4; align-self: center; width: 100%; text-align: center; }
+        .msg-time { font-size: 10px; color: #777; display: block; margin-top: 4px; text-align: left; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>لوحة الموظف: <span id="emp-welcome-name" style="color: #2980b9;"></span></h2>
+            <button onclick="goBack()" class="btn-danger" style="width: auto; padding: 8px 15px;">رجوع</button>
+        </div>
+        <hr>
+
+        <div id="employee-notification-alert" class="notification-banner hidden">
+            <span>🔔 تنبيه: تلقيت رسالة جديدة من الإدارة!</span>
+            <button onclick="dismissEmployeeNotification()" style="background: white; color: #e74c3c; width: auto; padding: 5px 10px; margin:0; font-size: 12px;">إغلاق</button>
+        </div>
+
+        <div id="admin-live-location-box" class="hidden" style="margin-bottom: 15px;">
+            <button onclick="trackLiveLocation()" class="btn-info" style="font-size: 15px; padding: 10px;">📍 عرض موقع الموظف الحالي (تتبع حي مباشر)</button>
+        </div>
+
+        <div id="employee-gps-box" style="margin-bottom: 15px;">
+            <button onclick="enableEmployeeLocation()" class="btn-success" style="font-size: 15px; padding: 10px;">📍 تفعيل ومشاركة الموقع الجغرافي</button>
+            <p id="gps-status-label" style="font-size: 12px; color: gray; margin: 5px 0 0 0; text-align: center;">حالة الموقع: لم يتم التفعيل بعد</p>
+        </div>
+
+        <!-- قسم إدارة حساب الموظف من قبل الآدمن -->
+        <div id="admin-edit-employee-section" class="hidden" style="background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin:0; color: #2980b9;">⚙️ إدارة حساب وراتب هذا الموظف</h3>
+                <button onclick="toggleEditMode()" id="btn-toggle-edit" class="btn-info" style="width: auto; padding: 6px 12px; margin:0; font-size: 14px;">✏️ تعديل البيانات</button>
+            </div>
+
+            <label style="font-size: 13px; font-weight: bold;">الاسم الكامل:</label>
+            <input type="text" id="edit-emp-name" disabled>
+            
+            <label style="font-size: 13px; font-weight: bold;">اسم المستخدم:</label>
+            <input type="text" id="edit-emp-user" disabled>
+            
+            <label style="font-size: 13px; font-weight: bold;">كلمة المرور الجديدة:</label>
+            <input type="password" id="edit-emp-pass" placeholder="كلمة المرور الجديدة (اتركها فارغة إذا لم ترد تغييرها)" disabled>
+
+            <label style="font-size: 13px; font-weight: bold;">الراتب الأساسي ($):</label>
+            <input type="number" id="edit-emp-salary" disabled min="0">
+            
+            <div id="edit-actions-box" class="hidden" style="display: flex; gap: 10px; margin-top: 10px;">
+                <button onclick="saveEmployeeChanges()" class="btn-success" style="margin:0;">حفظ التعديلات</button>
+                <button onclick="deleteThisEmployee()" class="btn-danger" style="margin:0; width: 180px;">حذف المستخدم بالكامل</button>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px;" id="attendance-main-btn-container">
+            <button onclick="toggleAttendanceSection()" class="btn-warning" style="font-size: 16px;">⏱️ الدوام وساعات العمل</button>
+        </div>
+
+        <div id="attendance-toggle-section" class="hidden" style="background: #fdfdfd; border: 2px dashed #e67e22; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <div id="employee-active-timer-box" style="background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 15px;">
+                <h3 id="timer-display" style="font-size: 28px; color: #2c3e50; font-family: monospace; margin: 5px 0;">00:00:00</h3>
+                <p id="attendance-status-text" style="color: #e74c3c; font-weight: bold;">الحالة: منصرف</p>
+                <div id="employee-actions-box">
+                    <button onclick="startAttendance()" class="btn-success" id="btn-start">تسجيل حضور</button>
+                    <button onclick="endAttendance()" class="btn-danger hidden" id="btn-end">تسجيل انصراف</button>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 15px;">📅 سجل الدوام التاريخي</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>التاريخ</th>
+                        <th>الدخول</th>
+                        <th>الانصراف</th>
+                        <th>الإجمالي</th>
+                        <th>الموقع</th>
+                    </tr>
+                </thead>
+                <tbody id="attendance-history-body"></tbody>
+            </table>
+        </div>
+
+        <h3 style="margin-top: 30px;">المحادثة المباشرة مع الإدارة</h3>
+        <div class="chat-box" id="chat-messages-box"></div>
+        <div style="display: flex; gap: 10px;">
+            <input type="text" id="chat-input-text" placeholder="اكتب ردك أو رسالتك هنا..." style="margin:0;" onkeypress="if(event.key === 'Enter') sendChatMessage()">
+            <button onclick="sendChatMessage()" style="width: 120px; margin:0;">إرسال</button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "YOUR_SUPABASE_URL";
+        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let role = localStorage.getItem('hr_logged_role');
+        let empId = role === 'admin' ? localStorage.getItem('hr_managing_emp_id') : localStorage.getItem('hr_logged_emp_id');
+        let activeEmployee = null;
+        let timerInterval = null;
+        let watchId = null;
+        let isEditingEnabled = false;
+
+        window.onload = async function() {
+            if (!empId) { window.location.href = 'index.html'; return; }
+            await fetchEmployeeData();
+            loadChatMessages();
+            checkNotifications();
+        };
+
+        async function fetchEmployeeData() {
+            let { data } = await supabase.from('employees').select('*').eq('id', empId).single();
+            if (!data) { window.location.href = 'index.html'; return; }
+            activeEmployee = data;
+
+            document.getElementById('emp-welcome-name').innerText = activeEmployee.name + (role === 'admin' ? " (إدارة الآدمن)" : "");
+
+            let editSection = document.getElementById('admin-edit-employee-section');
+            let activeTimerBox = document.getElementById('employee-active-timer-box');
+            let liveLocBox = document.getElementById('admin-live-location-box');
+            let empGpsBox = document.getElementById('employee-gps-box');
+
+            if (role === 'admin') {
+                editSection.classList.remove('hidden');
+                if (activeTimerBox) activeTimerBox.style.display = 'none';
+                if (liveLocBox) liveLocBox.classList.remove('hidden');
+                if (empGpsBox) empGpsBox.style.display = 'none';
+                applyEditingState();
+            } else {
+                editSection.classList.add('hidden');
+                if (liveLocBox) liveLocBox.classList.add('hidden');
+                if (empGpsBox) empGpsBox.style.display = 'block';
+            }
+
+            if (activeEmployee.current_lat && activeEmployee.current_lon) {
+                document.getElementById('gps-status-label').innerText = "حالة الموقع: مفعل وجاهز ✅";
+                document.getElementById('gps-status-label').style.color = "green";
+            }
+
+            updateAttendanceUI();
+            startTimerEngine();
+            loadAttendanceHistory();
+        }
+
+        function goBack() {
+            stopTimer();
+            if (role === 'admin') {
+                localStorage.removeItem('hr_managing_emp_id');
+                window.location.href = 'admin.html';
+            } else {
+                localStorage.clear();
+                window.location.href = 'index.html';
+            }
+        }
+
+        function enableEmployeeLocation() {
+            if (!navigator.geolocation) { alert('متصفحك لا يدعم تحديد الموقع.'); return; }
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                await supabase.from('employees').update({
+                    current_lat: pos.coords.latitude,
+                    current_lon: pos.coords.longitude
+                }).eq('id', empId);
+                document.getElementById('gps-status-label').innerText = "حالة الموقع: مفعل بنجاح ✅";
+                document.getElementById('gps-status-label').style.color = "green";
+                alert('تم تفعيل ومشاركة موقعك بنجاح 📍');
+            }, () => { alert('فشل تفعيل الموقع.'); });
+        }
+
+        function trackLiveLocation() {
+            if (!activeEmployee.current_lat || !activeEmployee.current_lon) {
+                alert('الموظف لم يقم بتفعيل موقعه بعد.');
+                return;
+            }
+            window.open(`https://www.google.com/maps?q=${activeEmployee.current_lat},${activeEmployee.current_lon}`, '_blank');
+        }
+
+        function toggleEditMode() {
+            isEditingEnabled = !isEditingEnabled;
+            applyEditingState();
+        }
+
+        function applyEditingState() {
+            let nameInput = document.getElementById('edit-emp-name');
+            let userInput = document.getElementById('edit-emp-user');
+            let passInput = document.getElementById('edit-emp-pass');
+            let salaryInput = document.getElementById('edit-emp-salary');
+            let actionsBox = document.getElementById('edit-actions-box');
+            let toggleBtn = document.getElementById('btn-toggle-edit');
+
+            if (isEditingEnabled) {
+                nameInput.disabled = false;
+                userInput.disabled = false;
+                passInput.disabled = false;
+                salaryInput.disabled = false;
+                actionsBox.classList.remove('hidden');
+                toggleBtn.innerText = "🔒 إيقاف التعديل";
+                toggleBtn.style.backgroundColor = "#e74c3c";
+            } else {
+                nameInput.disabled = true;
+                userInput.disabled = true;
+                passInput.disabled = true;
+                salaryInput.disabled = true;
+                actionsBox.classList.add('hidden');
+                toggleBtn.innerText = "✏️ تعديل البيانات";
+                toggleBtn.style.backgroundColor = "#1abc9c";
+                
+                nameInput.value = activeEmployee.name;
+                userInput.value = activeEmployee.username;
+                passInput.value = '';
+                salaryInput.value = activeEmployee.salary || 0;
+            }
+        }
+
+        async function saveEmployeeChanges() {
+            let name = document.getElementById('edit-emp-name').value.trim();
+            let username = document.getElementById('edit-emp-user').value.trim();
+            let pass = document.getElementById('edit-emp-pass').value.trim();
+            let salary = parseFloat(document.getElementById('edit-emp-salary').value) || 0;
+
+            let obj = { name, username, salary };
+            if (pass) obj.password = pass;
+
+            let { error } = await supabase.from('employees').update(obj).eq('id', empId);
+            if (error) alert('خطأ في التحديث أو اسم المستخدم مستخدم مسبقاً.');
+            else {
+                alert('تم التحديث بنجاح!');
+                isEditingEnabled = false;
+                fetchEmployeeData();
+            }
+        }
+
+        async function deleteThisEmployee() {
+            if (!confirm('هل أنت متأكد من الحذف؟')) return;
+            await supabase.from('employees').delete().eq('id', empId);
+            goBack();
+        }
+
+        function toggleAttendanceSection() {
+            document.getElementById('attendance-toggle-section').classList.toggle('hidden');
+        }
+
+        async function startAttendance() {
+            if (role === 'admin') return;
+
+            if (navigator.geolocation) {
+                watchId = navigator.geolocation.watchPosition(async (pos) => {
+                    await supabase.from('employees').update({
+                        current_lat: pos.coords.latitude,
+                        current_lon: pos.coords.longitude
+                    }).eq('id', empId);
+                }, null, { enableHighAccuracy: true });
+            }
+
+            let now = new Date();
+            let startObj = {
+                startTimeEpoch: now.getTime(),
+                startDateStr: now.toLocaleDateString(),
+                startTimeStr: now.toLocaleTimeString()
+            };
+            localStorage.setItem(`temp_start_${empId}`, JSON.stringify(startObj));
+
+            await supabase.from('employees').update({ status: 'على رأس العمل' }).eq('id', empId);
+            alert('تم تسجيل الحضور بنجاح 🟢');
+            fetchEmployeeData();
+        }
+
+        async function endAttendance() {
+            if (role === 'admin') return;
+            if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+
+            let startData = JSON.parse(localStorage.getItem(`temp_start_${empId}`));
+            if (!startData) { alert('لا يوجد حضور نشط مسجل.'); return; }
+
+            let now = new Date();
+            let endTimeStr = now.toLocaleTimeString();
+            let totalSec = Math.floor((now.getTime() - startData.startTimeEpoch) / 1000);
+            let totalHoursStr = `${Math.floor(totalSec / 3600)}س ${Math.floor((totalSec % 3600) / 60)}د ${totalSec % 60}ث`;
+
+            let mapLink = activeEmployee.current_lat ? `https://www.google.com/maps?q=${activeEmployee.current_lat},${activeEmployee.current_lon}` : null;
+
+            await supabase.from('attendance_history').insert([{
+                employee_id: empId,
+                work_date: startData.startDateStr,
+                start_time: startData.startTimeStr,
+                end_time: endTimeStr,
+                total_hours: totalHoursStr,
+                location: mapLink
+            }]);
+
+            await supabase.from('employees').update({ status: 'منصرف', current_lat: null, current_lon: null }).eq('id', empId);
+            localStorage.removeItem(`temp_start_${empId}`);
+            stopTimer();
+
+            alert('تم تسجيل الانصراف وحفظ السجل بنجاح!');
+            fetchEmployeeData();
+        }
+
+        function updateAttendanceUI() {
+            let statusText = document.getElementById('attendance-status-text');
+            let btnStart = document.getElementById('btn-start');
+            let btnEnd = document.getElementById('btn-end');
+
+            if (activeEmployee.status === 'على رأس العمل') {
+                statusText.innerText = "الحالة: على رأس العمل حالياً 🟢";
+                statusText.style.color = "green";
+                btnStart.classList.add('hidden');
+                btnEnd.classList.remove('hidden');
+            } else {
+                statusText.innerText = "الحالة: منصرف 🔴";
+                statusText.style.color = "#e74c3c";
+                btnStart.classList.remove('hidden');
+                btnEnd.classList.add('hidden');
+                document.getElementById('timer-display').innerText = "00:00:00";
+            }
+        }
+
+        function startTimerEngine() {
+            stopTimer();
+            let startData = JSON.parse(localStorage.getItem(`temp_start_${empId}`));
+            if (activeEmployee.status !== 'على رأس العمل' || !startData) return;
+
+            timerInterval = setInterval(() => {
+                let diffSec = Math.floor((new Date().getTime() - startData.startTimeEpoch) / 1000);
+                let h = String(Math.floor(diffSec / 3600)).padStart(2, '0');
+                let m = String(Math.floor((diffSec % 3600) / 60)).padStart(2, '0');
+                let s = String(diffSec % 60).padStart(2, '0');
+                document.getElementById('timer-display').innerText = `${h}:${m}:${s}`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+        }
+
+        async function loadAttendanceHistory() {
+            let tbody = document.getElementById('attendance-history-body');
+            let { data: history } = await supabase.from('attendance_history').select('*').eq('employee_id', empId).order('created_at', { ascending: false });
+
+            if (!history || history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="color: gray;">لا توجد سجلات سابقة.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            history.forEach(item => {
+                let mapBtn = item.location ? `<a href="${item.location}" target="_blank" style="color:#3498db; font-weight:bold;">خريطة 🗺️</a>` : 'غير متاح';
+                tbody.innerHTML += `
+                    <tr>
+                        <td><b>${item.work_date}</b></td>
+                        <td style="color:green;">${item.start_time}</td>
+                        <td style="color:red;">${item.end_time}</td>
+                        <td><b>${item.total_hours}</b></td>
+                        <td>${mapBtn}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function loadChatMessages() {
+            let box = document.getElementById('chat-messages-box');
+            let { data: messages } = await supabase.from('messages').select('*').or(`receiver.eq.${activeEmployee.username},receiver.eq.all,sender.eq.${activeEmployee.username}`).order('created_at', { ascending: true });
+
+            box.innerHTML = '';
+            if (!messages || messages.length === 0) {
+                box.innerHTML = '<p style="color: gray; text-align: center; margin: auto;">لا توجد رسائل سابقة.</p>';
+                return;
+            }
+
+            messages.forEach(m => {
+                let div = document.createElement('div');
+                div.className = 'message-bubble';
+                if (m.receiver === 'all') {
+                    div.className += ' msg-broadcast';
+                    div.innerHTML = `📢 <b>[رسالة جماعية]:</b> ${m.text} <span class="msg-time">${m.time_str}</span>`;
+                } else if (m.sender === 'admin') {
+                    div.className += ' msg-incoming';
+                    div.innerHTML = `<b>الآدمن:</b> ${m.text} <span class="msg-time">${m.time_str}</span>`;
+                } else {
+                    div.className += ' msg-outgoing';
+                    div.innerHTML = `<b>${activeEmployee.name}:</b> ${m.text} <span class="msg-time">${m.time_str}</span>`;
+                }
+                box.appendChild(div);
+            });
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function sendChatMessage() {
+            let input = document.getElementById('chat-input-text');
+            let text = input.value.trim();
+            if (!text) return;
+
+            let sender = role === 'admin' ? 'admin' : activeEmployee.username;
+            let receiver = role === 'admin' ? activeEmployee.username : 'admin';
+
+            await supabase.from('messages').insert([{
+                sender: sender,
+                receiver: receiver,
+                text: text,
+                time_str: new Date().toLocaleTimeString(),
+                read_by_admin: role === 'admin'
+            }]);
+
+            input.value = '';
+            loadChatMessages();
+        }
+
+        async function checkNotifications() {
+            if (role === 'admin') return;
+            let { data } = await supabase.from('messages').select('*').eq('receiver', activeEmployee.username).eq('sender', 'admin');
+            if (data && data.length > 0) {
+                document.getElementById('employee-notification-alert').classList.remove('hidden');
+            }
+        }
+
+        function dismissEmployeeNotification() {
+            document.getElementById('employee-notification-alert').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

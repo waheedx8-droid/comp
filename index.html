@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل الدخول - نظام إدارة الدوام الشامل</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .container { width: 100%; max-width: 400px; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
+        h2 { color: #2c3e50; margin-bottom: 20px; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+        button { background-color: #3498db; color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.3s; }
+        button:hover { background-color: #2980b9; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>تسجيل الدخول للنظام</h2>
+        <input type="text" id="login-user" placeholder="اسم المستخدم">
+        <input type="password" id="login-pass" placeholder="كلمة المرور">
+        <button onclick="handleLogin()">دخول</button>
+        <p id="loading-msg" style="font-size: 13px; color: #e74c3c; display: none;">جاري التحقق...</p>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "YOUR_SUPABASE_URL";
+        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        async function handleLogin() {
+            let u = document.getElementById('login-user').value.trim();
+            let p = document.getElementById('login-pass').value.trim();
+            if (!u || !p) { alert('الرجاء إدخال اسم المستخدم وكلمة المرور!'); return; }
+
+            let msg = document.getElementById('loading-msg');
+            msg.style.display = 'block';
+
+            try {
+                let { data: admin } = await supabase.from('admin').select('*').eq('username', u).eq('password', p).single();
+                if (admin) {
+                    localStorage.setItem('hr_logged_role', 'admin');
+                    window.location.href = 'admin.html';
+                    return;
+                }
+
+                let { data: emp } = await supabase.from('employees').select('*').eq('username', u).eq('password', p).single();
+                if (emp) {
+                    localStorage.setItem('hr_logged_role', 'employee');
+                    localStorage.setItem('hr_logged_emp_id', emp.id);
+                    window.location.href = 'employee.html';
+                    return;
+                }
+
+                alert('اسم المستخدم أو كلمة المرور غير صحيحة!');
+            } catch (e) {
+                alert('خطأ في الاتصال بقاعدة البيانات.');
+            } finally {
+                msg.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

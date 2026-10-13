@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم المدير - نظام إدارة الدوام</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2, h3 { color: #2c3e50; }
+        input, select, button, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+        button { background-color: #3498db; color: white; border: none; cursor: pointer; font-weight: bold; transition: background 0.3s; }
+        button:hover { background-color: #2980b9; }
+        .btn-danger { background-color: #e74c3c; }
+        .btn-danger:hover { background-color: #c0392b; }
+        .btn-success { background-color: #2ecc71; }
+        .btn-success:hover { background-color: #27ae60; }
+        .btn-warning { background-color: #e67e22; color: white; }
+        .btn-warning:hover { background-color: #d35400; }
+        .hidden { display: none !important; }
+        .notification-banner { background-color: #e74c3c; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: center; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; }
+        tr.clickable { cursor: pointer; }
+        tr.clickable:hover { background-color: #f1f9ff; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>لوحة تحكم المدير</h2>
+            <button onclick="adminLogout()" class="btn-danger" style="width: auto; padding: 8px 15px;">تسجيل خروج</button>
+        </div>
+        <hr>
+
+        <div id="admin-notification-alert" class="notification-banner hidden">
+            <span>⚠️ لديك رسائل جديدة غير مقروءة من الموظفين!</span>
+            <button onclick="dismissAdminNotification()" style="background: white; color: #e74c3c; width: auto; padding: 5px 10px; margin:0; font-size: 12px;">إغلاق الإشعار</button>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+            <button onclick="toggleAdminPasswordSection()" class="btn-warning" style="font-size: 15px; width: auto; padding: 10px 20px;">🔑 تغيير كلمة مرور المدير</button>
+            <button onclick="window.location.href='salaries.html'" class="btn-success" style="font-size: 15px; width: auto; padding: 10px 20px;">💵 جدول الرواتب والأجور</button>
+        </div>
+
+        <div id="admin-password-section" class="hidden" style="background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+            <h3 style="margin-top:0; color: #2980b9;">تعديل كلمة مرور المدير</h3>
+            <input type="password" id="new-admin-pass" placeholder="كلمة المرور الجديدة">
+            <button onclick="saveAdminPassword()" class="btn-success" style="width: auto; padding: 10px 20px;">حفظ</button>
+        </div>
+
+        <h3>إضافة موظف جديد</h3>
+        <input type="text" id="new-emp-name" placeholder="الاسم الكامل">
+        <input type="text" id="new-emp-user" placeholder="اسم المستخدم">
+        <input type="password" id="new-emp-pass" placeholder="كلمة المرور">
+        <input type="number" id="new-emp-salary" placeholder="الراتب الأساسي ($)" min="0">
+        <button onclick="addNewEmployee()" class="btn-success">حفظ وإضافة الموظف</button>
+
+        <h3 style="margin-top: 30px;">قائمة الموظفين</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>الاسم الكامل</th>
+                    <th>اسم المستخدم</th>
+                    <th>حالة الدوام الحالي</th>
+                    <th>الإجراء / الإشعارات</th>
+                </tr>
+            </thead>
+            <tbody id="employees-table-body"></tbody>
+        </table>
+
+        <h3 style="margin-top: 30px;">📢 إرسال رسالة جماعية لكل الموظفين</h3>
+        <input type="text" id="admin-broadcast-text" placeholder="اكتب رسالة جماعية لكل الموظفين...">
+        <button onclick="sendBroadcastMessage()">إرسال للجميع</button>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "YOUR_SUPABASE_URL";
+        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        if (localStorage.getItem('hr_logged_role') !== 'admin') {
+            window.location.href = 'index.html';
+        }
+
+        window.onload = function() {
+            loadAdminDashboard();
+        };
+
+        function adminLogout() {
+            localStorage.removeItem('hr_logged_role');
+            window.location.href = 'index.html';
+        }
+
+        function toggleAdminPasswordSection() {
+            document.getElementById('admin-password-section').classList.toggle('hidden');
+        }
+
+        async function saveAdminPassword() {
+            let newPass = document.getElementById('new-admin-pass').value.trim();
+            if (!newPass) { alert('الرجاء إدخال كلمة المرور'); return; }
+            let { error } = await supabase.from('admin').update({ password: newPass }).eq('username', 'admin');
+            if (error) alert('حدث خطأ'); else { alert('تم الحفظ بنجاح!'); toggleAdminPasswordSection(); }
+        }
+
+        async function loadAdminDashboard() {
+            let tbody = document.getElementById('employees-table-body');
+            let { data: employees } = await supabase.from('employees').select('*');
+            let { data: messages } = await supabase.from('messages').select('*').eq('receiver', 'admin').eq('read_by_admin', false);
+
+            if (messages && messages.length > 0) {
+                document.getElementById('admin-notification-alert').classList.remove('hidden');
+            }
+
+            tbody.innerHTML = '';
+            if (!employees || employees.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="color: gray;">لا توجد موظفين.</td></tr>';
+                return;
+            }
+
+            employees.forEach(emp => {
+                let hasUnread = messages && messages.some(m => m.sender === emp.username);
+                let badge = hasUnread ? '<span style="background: #e74c3c; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin-right: 5px;">رسالة جديدة 🔔</span>' : '';
+
+                let tr = document.createElement('tr');
+                tr.className = 'clickable';
+                tr.onclick = async () => {
+                    localStorage.setItem('hr_managing_emp_id', emp.id);
+                    window.location.href = 'employee.html';
+                };
+                tr.innerHTML = `
+                    <td><b>${emp.name}</b> ${badge}</td>
+                    <td>${emp.username}</td>
+                    <td><span style="color: ${emp.status === 'على رأس العمل' ? 'green' : 'red'};">${emp.status}</span></td>
+                    <td>إدارة السجل والراتب والمحادثة</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function dismissAdminNotification() {
+            await supabase.from('messages').update({ read_by_admin: true }).eq('receiver', 'admin');
+            document.getElementById('admin-notification-alert').classList.add('hidden');
+            loadAdminDashboard();
+        }
+
+        async function addNewEmployee() {
+            let name = document.getElementById('new-emp-name').value.trim();
+            let user = document.getElementById('new-emp-user').value.trim();
+            let pass = document.getElementById('new-emp-pass').value.trim();
+            let salary = parseFloat(document.getElementById('new-emp-salary').value) || 0;
+
+            if (!name || !user || !pass) { alert('الرجاء تعبئة الحقول الأساسية'); return; }
+
+            let { error } = await supabase.from('employees').insert([{ name, username: user, password: pass, salary }]);
+            if (error) alert('اسم المستخدم مستخدم مسبقاً'); else {
+                alert('تم إضافة الموظف بنجاح!');
+                document.getElementById('new-emp-name').value = '';
+                document.getElementById('new-emp-user').value = '';
+                document.getElementById('new-emp-pass').value = '';
+                document.getElementById('new-emp-salary').value = '';
+                loadAdminDashboard();
+            }
+        }
+
+        async function sendBroadcastMessage() {
+            let text = document.getElementById('admin-broadcast-text').value.trim();
+            if (!text) return;
+
+            await supabase.from('messages').insert([{
+                sender: 'admin',
+                receiver: 'all',
+                text: text,
+                time_str: new Date().toLocaleTimeString()
+            }]);
+
+            document.getElementById('admin-broadcast-text').value = '';
+            alert('تم إرسال الرسالة الجماعية بنجاح!');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة الرواتب والأجور - لوحة المدير</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #2c3e50; }
+        button { background-color: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #2980b9; }
+        .btn-danger { background-color: #e74c3c; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: center; border-bottom: 1px solid #ddd; font-size: 14px; }
+        th { background-color: #f8f9fa; color: #2c3e50; }
+        input[type="number"] { width: 85px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; }
+        input[type="text"] { width: 85px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; background-color: #e9ecef; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>💰 جدول رواتب وأجور الموظفين (سحابي)</h2>
+            <button onclick="window.location.href='admin.html'" class="btn-danger" style="width: auto;">⬅️ رجوع</button>
+        </div>
+        <hr>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>اسم الموظف</th>
+                    <th>الراتب الأساسي ($)</th>
+                    <th>المكافآت ($)</th>
+                    <th>الخصم ($)</th>
+                    <th>الراتب الصافي ($)</th>
+                    <th>الإجراء</th>
+                </tr>
+            </thead>
+            <tbody id="salaries-table-body"></tbody>
+        </table>
+    </div>
+
+    <script>
+        const SUPABASE_URL = "YOUR_SUPABASE_URL";
+        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        if (localStorage.getItem('hr_logged_role') !== 'admin') {
+            window.location.href = 'index.html';
+        }
+
+        window.onload = function() {
+            loadSalaries();
+        };
+
+        async function loadSalaries() {
+            let tbody = document.getElementById('salaries-table-body');
+            let { data: employees, error } = await supabase.from('employees').select('*');
+
+            if (error || !employees || employees.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="color: gray;">لا توجد بيانات موظفين.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            employees.forEach((emp) => {
+                let netSalary = (emp.salary || 0) + (emp.bonus || 0) - (emp.discount || 0);
+
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><b>${emp.name}</b></td>
+                    <td><input type="text" value="${emp.salary || 0}" disabled></td>
+                    <td><input type="number" id="bonus-${emp.id}" value="${emp.bonus || 0}" min="0"></td>
+                    <td><input type="number" id="discount-${emp.id}" value="${emp.discount || 0}" min="0"></td>
+                    <td style="color: #e67e22; font-weight: bold; font-size: 16px;">${netSalary} $</td>
+                    <td><button onclick="saveSalary('${emp.id}')" style="padding: 6px 12px; font-size: 13px;">حفظ</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function saveSalary(empId) {
+            let bonus = parseFloat(document.getElementById(`bonus-${empId}`).value) || 0;
+            let discount = parseFloat(document.getElementById(`discount-${empId}`).value) || 0;
+
+            let { error } = await supabase.from('employees').update({ bonus, discount }).eq('id', empId);
+            if (error) { alert('خطأ أثناء الحفظ.'); } else { alert('تم تحديث المكافآت والخصومات بنجاح!'); loadSalaries(); }
+        }
+    </script>
+</body>
+</html>
