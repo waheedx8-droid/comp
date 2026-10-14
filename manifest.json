@@ -11,7 +11,7 @@
   "id": "mahood",
   "icons": [
     {
-      "src": "icon.jpg",
+      "src": "icon.png",
       "sizes": "512x512",
       "type": "image/jpeg",
       "purpose": "any maskable"
