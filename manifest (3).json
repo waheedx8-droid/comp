@@ -1,0 +1,12 @@
+{
+  "background_color": "#d15959",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "waheedx8-droid.github",
+  "orientation": "any",
+  "scope": "/",
+  "short_name": "waheedx8-droid.github",
+  "start_url": "/",
+  "theme_color": "#e4bdbd",
+  "id": "mahood"
+}
