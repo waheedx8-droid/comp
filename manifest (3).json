@@ -2,11 +2,19 @@
   "background_color": "#d15959",
   "dir": "ltr",
   "display": "standalone",
-  "name": "waheedx8-droid.github",
+  "name": "نظام إدارة الدوام",
   "orientation": "any",
-  "scope": "/",
-  "short_name": "waheedx8-droid.github",
-  "start_url": "/",
+  "scope": "/comp/",
+  "short_name": "HR System",
+  "start_url": "/comp/index.html",
   "theme_color": "#e4bdbd",
-  "id": "mahood"
+  "id": "mahood",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
